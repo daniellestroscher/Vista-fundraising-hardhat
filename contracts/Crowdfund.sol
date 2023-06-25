@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
 
 //import "./CrowdfundMarket.sol";
 // Uncomment this line to use console.log
@@ -11,56 +11,58 @@ contract Crowdfund {
   uint public raised;
   address CrowdfundOwner;
 
-  mapping (address => uint) addressToContribution;
-    constructor(uint _goal) {
-      goal = _goal;
-      goalReached = false;
-      raised = 0;
-      CrowdfundOwner = tx.origin;
-    }
+  mapping(address => uint) addressToContribution;
 
-    modifier onlyOwner() {
-        require(msg.sender == CrowdfundOwner, "You do not own this contract.");
-        _;
-    }
+  constructor(uint _goal) {
+    goal = _goal;
+    goalReached = false;
+    raised = 0;
+    CrowdfundOwner = tx.origin;
+  }
 
-    function getOwner() public view returns (address) {
-        return CrowdfundOwner;
-    }
+  modifier onlyOwner() {
+    require(msg.sender == CrowdfundOwner, "You do not own this contract.");
+    _;
+  }
 
-    function getBalance() public view returns (uint) {
-      return address(this).balance;
-    }
+  function getOwner() public view returns (address) {
+    return CrowdfundOwner;
+  }
 
-    function donate() public payable {
-      //require (msg.value >= minContribution, "error: your donation didn't meet minimum requirment");
-      addressToContribution[msg.sender] += msg.value;
-      raised += msg.value;
-      updateGoalStatus();
-    }
-    function updateGoalStatus() internal {
-      //require (address(this).balance >= goal, 'the goal has not been reached yet.');
-      if (address(this).balance >= goal) {
-        goalReached = true;
-      }
-    }
+  function getBalance() public view returns (uint) {
+    return address(this).balance;
+  }
 
-    function withdraw() public onlyOwner {
-      require (address(this).balance > 0, "sorry, nothing to withdraw.");
-      payable(CrowdfundOwner).transfer(address(this).balance);
-    }
+  function donate() public payable {
+    //require (msg.value >= minContribution, "error: your donation didn't meet minimum requirment");
+    addressToContribution[msg.sender] += msg.value;
+    raised += msg.value;
+    updateGoalStatus();
+  }
 
-    function checkIfContributor(address _checkAddress) public view returns (bool) {
-      if(addressToContribution[_checkAddress] > 0) {
-        return true;
-      } else {
-        return false;
-      }
+  function updateGoalStatus() internal {
+    //require (address(this).balance >= goal, 'the goal has not been reached yet.');
+    if (address(this).balance >= goal) {
+      goalReached = true;
     }
+  }
 
-    receive() external payable {
-      addressToContribution[msg.sender] += msg.value;
-      raised += msg.value;
-      updateGoalStatus();
+  function withdraw() public onlyOwner {
+    require(address(this).balance > 0, "sorry, nothing to withdraw.");
+    payable(CrowdfundOwner).transfer(address(this).balance);
+  }
+
+  function checkIfContributor(address _checkAddress) public view returns (bool) {
+    if (addressToContribution[_checkAddress] > 0) {
+      return true;
+    } else {
+      return false;
     }
+  }
+
+  receive() external payable {
+    addressToContribution[msg.sender] += msg.value;
+    raised += msg.value;
+    updateGoalStatus();
+  }
 }
