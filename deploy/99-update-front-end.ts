@@ -1,5 +1,4 @@
 import { ethers, network, deployments } from "hardhat"
-import { ethers as eth } from "ethers"
 import fs from "fs"
 import { Deployment } from "hardhat-deploy/dist/types"
 
@@ -19,10 +18,6 @@ async function UpdateFrontend() {
 }
 
 async function updateContractAddresses(marketplaceDeployment: Deployment) {
-  const crowdfundMarketplace = await ethers.getContractAt(
-    marketplaceDeployment.abi,
-    marketplaceDeployment.address
-  )
   const chainId = network.config.chainId as number
 
   const contractAddresses = JSON.parse(fs.readFileSync(frontEndContractsFile, "utf8"))
@@ -41,16 +36,11 @@ async function updateContractAddresses(marketplaceDeployment: Deployment) {
 }
 
 async function updateAbi(marketplaceDeployment: Deployment, crowdfundDeployment: Deployment) {
-  const crowdfundMarketplace = await ethers.getContractAt(
-    marketplaceDeployment.abi,
-    marketplaceDeployment.address
-  )
   fs.writeFileSync(
     `${frontEndAbiLocation}CrowdfundMarketplace.json`,
-    crowdfundMarketplace.interface.formatJson()
+    JSON.stringify(marketplaceDeployment.abi) //crowdfundMarketplace.interface.formatJson()
   )
-  const crowdfund = await ethers.getContractAt(crowdfundDeployment.abi, crowdfundDeployment.address)
-  fs.writeFileSync(`${frontEndAbiLocation}Crowdfund.json`, crowdfund.interface.formatJson())
+  fs.writeFileSync(`${frontEndAbiLocation}Crowdfund.json`, JSON.stringify(crowdfundDeployment.abi))
 }
 
 export default UpdateFrontend

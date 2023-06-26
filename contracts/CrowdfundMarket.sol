@@ -1,205 +1,157 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
-// Uncomment this line to use console.log
-// import "hardhat/console.sol";
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./Crowdfund.sol";
 
-contract CrowdfundMarket is ReentrancyGuard {
-    using Counters for Counters.Counter;
-    Counters.Counter private _funraiserIds;
-    //Counters.Counter private _fundsGoalsMet;
-    //uint _fundsGoalsMet;
+contract CrowdfundMarket {
+  using Counters for Counters.Counter;
+  Counters.Counter private _funraiserIds;
 
-    struct CrowdfundObj {
-        uint fundId;
-        string metaUrl;
-        address crowdfundContract;
-        address owner;
-        uint goal;
-    }
-    mapping(uint => CrowdfundObj) public idToCrowdfund;
-    mapping(address => uint) addressToId;
+  struct CrowdfundObj {
+    uint256 fundId;
+    string metaUrl;
+    address crowdfundContract;
+    address owner;
+    uint256 goal;
+  }
+  mapping(uint256 => CrowdfundObj) private s_idToCrowdfund;
+  mapping(address => uint256) private s_addressToId;
 
-    event CrowdfundCreated(
-        uint indexed fundId,
-        string metaUrl,
-        address indexed crowdfundContractAddress,
-        address owner,
-        uint256 goal
+  event CrowdfundCreated(
+    uint indexed fundId,
+    string indexed metaUrl,
+    address indexed crowdfundContractAddress,
+    address owner,
+    uint256 goal
+  );
+
+  function createCrowdfund(uint _goal, string memory _metaUrl) public {
+    _funraiserIds.increment();
+    uint256 fundId = _funraiserIds.current();
+
+    Crowdfund crowdfundContract = new Crowdfund(_goal, msg.sender);
+    address crowdfundContractAddress = address(crowdfundContract);
+    s_addressToId[crowdfundContractAddress] = fundId;
+
+    s_idToCrowdfund[fundId] = CrowdfundObj(
+      fundId,
+      _metaUrl,
+      crowdfundContractAddress,
+      payable(msg.sender),
+      _goal
     );
 
-    function createCrowdfund(
-        uint _goal,
-        string memory _metaUrl
-    ) public nonReentrant {
-        _funraiserIds.increment();
-        uint fundId = _funraiserIds.current();
+    emit CrowdfundCreated(fundId, _metaUrl, crowdfundContractAddress, msg.sender, _goal);
+  }
 
-        Crowdfund crowdfundContract = new Crowdfund(_goal);
-        address crowdfundContractAddress = address(crowdfundContract);
-        addressToId[crowdfundContractAddress] = fundId;
+  function getCrowdfund(uint256 _id) public view returns (CrowdfundObj memory) {
+    return s_idToCrowdfund[_id];
+  }
 
-        idToCrowdfund[fundId] = CrowdfundObj(
-            fundId,
-            _metaUrl,
-            crowdfundContractAddress,
-            payable(msg.sender),
-            _goal
-        );
-
-        emit CrowdfundCreated(
-            fundId,
-            _metaUrl,
-            crowdfundContractAddress,
-            msg.sender,
-            _goal
-        );
+  function getActiveFundraisers() public view returns (CrowdfundObj[] memory) {
+    uint256 fundraisersCount = _funraiserIds.current();
+    uint256 fundraiserGoalsMet = 0;
+    bool goalReached;
+    for (uint256 i = 0; i < fundraisersCount; i++) {
+      Crowdfund contractInstance = Crowdfund(payable(s_idToCrowdfund[i + 1].crowdfundContract));
+      goalReached = contractInstance.getGoalReached();
+      if (goalReached) fundraiserGoalsMet++;
     }
 
-    function getCrowdfund(uint _id) public view returns (CrowdfundObj memory) {
-      return idToCrowdfund[_id];
+    uint256 goalNotReachedCount = _funraiserIds.current() - fundraiserGoalsMet;
+    uint256 index = 0;
+
+    CrowdfundObj[] memory fundraisers = new CrowdfundObj[](goalNotReachedCount);
+    for (uint256 i = 0; i < fundraisersCount; i++) {
+      Crowdfund contractInstance = Crowdfund(payable(s_idToCrowdfund[i + 1].crowdfundContract));
+      goalReached = contractInstance.getGoalReached();
+      if (!goalReached) {
+        uint256 currentFundId = s_idToCrowdfund[i + 1].fundId;
+        CrowdfundObj storage currentCrowdfund = s_idToCrowdfund[currentFundId];
+        fundraisers[index] = currentCrowdfund;
+        index++;
+      }
     }
+    return fundraisers;
+  }
 
-    function getActiveFundraisers() public view returns (CrowdfundObj[] memory) {
-        uint fundraisersCount = _funraiserIds.current();
-        uint fundraiserGoalsMet = 0;
-        bool goalReached;
-        for (uint i = 0; i < fundraisersCount; i++) {
-          Crowdfund contractInstance = Crowdfund(payable(idToCrowdfund[i + 1].crowdfundContract));
-          goalReached = contractInstance.goalReached();
-          if (goalReached) fundraiserGoalsMet++;
-        }
+  function getMyFundraisers() public view returns (CrowdfundObj[] memory) {
+    uint256 fundraisersCount = _funraiserIds.current();
+    uint256 myFundraisersCount = 0;
+    uint256 index = 0;
 
-        uint goalNotReachedCount = _funraiserIds.current() - fundraiserGoalsMet;
-        uint index = 0;
-
-        CrowdfundObj[] memory fundraisers = new CrowdfundObj[](goalNotReachedCount);
-        for (uint i = 0; i < fundraisersCount; i++) {
-          Crowdfund contractInstance = Crowdfund(payable(idToCrowdfund[i + 1].crowdfundContract));
-          goalReached = contractInstance.goalReached();
-            if (!goalReached) {
-                uint currentFundId = idToCrowdfund[i + 1].fundId;
-                CrowdfundObj storage currentCrowdfund = idToCrowdfund[
-                    currentFundId
-                ];
-                fundraisers[index] = currentCrowdfund;
-                index++;
-            }
-        }
-        return fundraisers;
+    for (uint256 i = 0; i < fundraisersCount; i++) {
+      if (s_idToCrowdfund[i + 1].owner == msg.sender) {
+        myFundraisersCount++;
+      }
     }
+    CrowdfundObj[] memory fundraisers = new CrowdfundObj[](myFundraisersCount);
 
-    function getMyFundraisers() public view returns (CrowdfundObj[] memory) {
-        uint fundraisersCount = _funraiserIds.current();
-        uint myFundraisersCount = 0;
-        uint index = 0;
-
-        for (uint i = 0; i < fundraisersCount; i++) {
-            if (idToCrowdfund[i + 1].owner == msg.sender) {
-                myFundraisersCount++;
-            }
-        }
-        CrowdfundObj[] memory fundraisers = new CrowdfundObj[](
-            myFundraisersCount
-        );
-
-        for (uint i = 0; i < fundraisersCount; i++) {
-            if (idToCrowdfund[i + 1].owner == msg.sender) {
-                uint currentFundId = idToCrowdfund[i + 1].fundId;
-                CrowdfundObj storage currentCrowdfund = idToCrowdfund[
-                    currentFundId
-                ];
-                fundraisers[index] = currentCrowdfund;
-                index++;
-            }
-        }
-        return fundraisers;
+    for (uint256 i = 0; i < fundraisersCount; i++) {
+      if (s_idToCrowdfund[i + 1].owner == msg.sender) {
+        uint256 currentFundId = s_idToCrowdfund[i + 1].fundId;
+        CrowdfundObj storage currentCrowdfund = s_idToCrowdfund[currentFundId];
+        fundraisers[index] = currentCrowdfund;
+        index++;
+      }
     }
+    return fundraisers;
+  }
 
-    function getMyActiveFundraisers()
-        public
-        view
-        returns (CrowdfundObj[] memory)
-    {
-        uint fundraisersCount = _funraiserIds.current();
-        uint myActiveFundraisersCount = 0;
-        bool goalReached;
-        uint index = 0;
+  function getMyActiveFundraisers() public view returns (CrowdfundObj[] memory) {
+    uint256 fundraisersCount = _funraiserIds.current();
+    uint256 myActiveFundraisersCount = 0;
+    bool goalReached;
+    uint256 index = 0;
 
-        for (uint i = 0; i < fundraisersCount; i++) {
-          Crowdfund contractInstance = Crowdfund(payable(idToCrowdfund[i + 1].crowdfundContract));
-          goalReached = contractInstance.goalReached();
-            if (
-                idToCrowdfund[i + 1].owner == msg.sender &&
-                !goalReached
-            ) {
-                myActiveFundraisersCount++;
-            }
-        }
-        CrowdfundObj[] memory fundraisers = new CrowdfundObj[](
-            myActiveFundraisersCount
-        );
-
-        for (uint i = 0; i < fundraisersCount; i++) {
-          Crowdfund contractInstance = Crowdfund(payable(idToCrowdfund[i + 1].crowdfundContract));
-          goalReached = contractInstance.goalReached();
-            if (
-                idToCrowdfund[i + 1].owner == msg.sender &&
-                !goalReached
-            ) {
-                uint currentFundId = idToCrowdfund[i + 1].fundId;
-                CrowdfundObj storage currentCrowdfund = idToCrowdfund[
-                    currentFundId
-                ];
-                fundraisers[index] = currentCrowdfund;
-                index++;
-            }
-        }
-        return fundraisers;
+    for (uint256 i = 0; i < fundraisersCount; i++) {
+      Crowdfund contractInstance = Crowdfund(payable(s_idToCrowdfund[i + 1].crowdfundContract));
+      goalReached = contractInstance.getGoalReached();
+      if (s_idToCrowdfund[i + 1].owner == msg.sender && !goalReached) {
+        myActiveFundraisersCount++;
+      }
     }
+    CrowdfundObj[] memory fundraisers = new CrowdfundObj[](myActiveFundraisersCount);
 
-    function getMyCompletedFundraisers()
-        public
-        view
-        returns (CrowdfundObj[] memory)
-    {
-        uint fundraisersCount = _funraiserIds.current();
-        uint myCompletedFundraisersCount = 0;
-        bool goalReached;
-        uint index = 0;
-
-        for (uint i = 0; i < fundraisersCount; i++) {
-          Crowdfund contractInstance = Crowdfund(payable(idToCrowdfund[i + 1].crowdfundContract));
-          goalReached = contractInstance.goalReached();
-            if (
-                idToCrowdfund[i + 1].owner == msg.sender &&
-                goalReached
-            ) {
-                myCompletedFundraisersCount++;
-            }
-        }
-        CrowdfundObj[] memory fundraisers = new CrowdfundObj[](
-            myCompletedFundraisersCount
-        );
-
-        for (uint i = 0; i < fundraisersCount; i++) {
-          Crowdfund contractInstance = Crowdfund(payable(idToCrowdfund[i + 1].crowdfundContract));
-          goalReached = contractInstance.goalReached();
-            if (
-                idToCrowdfund[i + 1].owner == msg.sender &&
-                goalReached
-            ) {
-                uint currentFundId = idToCrowdfund[i + 1].fundId;
-                CrowdfundObj storage currentCrowdfund = idToCrowdfund[
-                    currentFundId
-                ];
-                fundraisers[index] = currentCrowdfund;
-                index++;
-            }
-        }
-        return fundraisers;
+    for (uint256 i = 0; i < fundraisersCount; i++) {
+      Crowdfund contractInstance = Crowdfund(payable(s_idToCrowdfund[i + 1].crowdfundContract));
+      goalReached = contractInstance.getGoalReached();
+      if (s_idToCrowdfund[i + 1].owner == msg.sender && !goalReached) {
+        uint256 currentFundId = s_idToCrowdfund[i + 1].fundId;
+        CrowdfundObj storage currentCrowdfund = s_idToCrowdfund[currentFundId];
+        fundraisers[index] = currentCrowdfund;
+        index++;
+      }
     }
+    return fundraisers;
+  }
+
+  function getMyCompletedFundraisers() public view returns (CrowdfundObj[] memory) {
+    uint256 fundraisersCount = _funraiserIds.current();
+    uint256 myCompletedFundraisersCount = 0;
+    bool goalReached;
+    uint256 index = 0;
+
+    for (uint256 i = 0; i < fundraisersCount; i++) {
+      Crowdfund contractInstance = Crowdfund(payable(s_idToCrowdfund[i + 1].crowdfundContract));
+      goalReached = contractInstance.getGoalReached();
+      if (s_idToCrowdfund[i + 1].owner == msg.sender && goalReached) {
+        myCompletedFundraisersCount++;
+      }
+    }
+    CrowdfundObj[] memory fundraisers = new CrowdfundObj[](myCompletedFundraisersCount);
+
+    for (uint256 i = 0; i < fundraisersCount; i++) {
+      Crowdfund contractInstance = Crowdfund(payable(s_idToCrowdfund[i + 1].crowdfundContract));
+      goalReached = contractInstance.getGoalReached();
+      if (s_idToCrowdfund[i + 1].owner == msg.sender && goalReached) {
+        uint256 currentFundId = s_idToCrowdfund[i + 1].fundId;
+        CrowdfundObj storage currentCrowdfund = s_idToCrowdfund[currentFundId];
+        fundraisers[index] = currentCrowdfund;
+        index++;
+      }
+    }
+    return fundraisers;
+  }
 }

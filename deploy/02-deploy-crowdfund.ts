@@ -12,7 +12,7 @@ const DeployCrowdfund: DeployFunction = async ({
   const { deployer } = await getNamedAccounts()
   const chainId = network.config.chainId as number
 
-  const args: any = [100] //goal in wei
+  const args: any = [100, deployer] //goal in wei //address of deployer
   const crowdfund = await deploy("Crowdfund", {
     from: deployer,
     args: args,
