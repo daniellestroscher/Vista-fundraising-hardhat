@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-error Cowdfund__GoalNotMet();
+// error Cowdfund__GoalNotMet();
 error Crowdfund__NothingToWithdraw();
 error Crowdfund__TransferFailed();
 error Crowdfund__NotOwner();
+error Crowdfund__NotEnoughEthSent();
 
 contract Crowdfund {
   uint256 private immutable i_goal;
@@ -37,6 +38,9 @@ contract Crowdfund {
   }
 
   function donate() public payable {
+    if (msg.value == 0) {
+      revert Crowdfund__NotEnoughEthSent();
+    }
     s_addressToContribution[msg.sender] += msg.value;
     s_raised += msg.value;
     updateGoalStatus();
@@ -53,11 +57,10 @@ contract Crowdfund {
   }
 
   function updateGoalStatus() internal {
-    if (address(this).balance < i_goal) {
-      revert Cowdfund__GoalNotMet();
-    }
     if (address(this).balance >= i_goal) {
       s_goalReached = true;
+    } else {
+      s_goalReached = false;
     }
   }
 
@@ -84,6 +87,10 @@ contract Crowdfund {
 
   function getGoalReached() public view returns (bool) {
     return s_goalReached;
+  }
+
+  function getGoal() public view returns (uint256) {
+    return i_goal;
   }
 
   function getContribution(address _contibutor) public view returns (uint256) {

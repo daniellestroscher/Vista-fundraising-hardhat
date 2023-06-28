@@ -1,7 +1,7 @@
 import { network } from "hardhat"
 import { DeployFunction } from "hardhat-deploy/dist/types"
 import { HardhatRuntimeEnvironment } from "hardhat/types"
-import { localChains, networkConfig } from "../hardhat-helper-config"
+import { localChains, networkConfig, GOAL } from "../hardhat-helper-config"
 import { verify } from "../utils/verify"
 
 const DeployCrowdfund: DeployFunction = async ({
@@ -12,7 +12,7 @@ const DeployCrowdfund: DeployFunction = async ({
   const { deployer } = await getNamedAccounts()
   const chainId = network.config.chainId as number
 
-  const args: any = [100, deployer] //goal in wei //address of deployer
+  const args: any = [GOAL, deployer]
   const crowdfund = await deploy("Crowdfund", {
     from: deployer,
     args: args,

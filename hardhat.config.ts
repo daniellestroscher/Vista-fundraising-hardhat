@@ -54,7 +54,7 @@ const config: HardhatUserConfig = {
       default: 0,
       1337: 0, //<-use chain id to tell which network the use the 0th account as deployer.
     },
-    player: {
+    accountTwo: {
       default: 1,
     },
   },
